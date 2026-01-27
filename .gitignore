@@ -1,0 +1,18 @@
+# Raw & processed data
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Outputs & trained models
+outputs/*
+models/*
+!outputs/.gitkeep
+!models/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+.ipynb_checkpoints/

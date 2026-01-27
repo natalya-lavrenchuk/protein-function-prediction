@@ -1,0 +1,14 @@
+data:
+  train_ids: "data/raw/biological_data_pfp/train/train_ids.txt"
+  test_ids: "data/raw/biological_data_pfp/test/test_ids.txt"
+  train_labels: "data/raw/biological_data_pfp/train/train_set.tsv"
+  train_embeddings: "data/raw/biological_data_pfp/train/train_embeddings.h5"
+  test_embeddings: "data/raw/biological_data_pfp/test/test_embeddings.h5"
+
+run:
+  seed: 42
+  aspects: ["molecular_function", "biological_process", "cellular_component"]
+
+features:
+  embedding_key: null
+
