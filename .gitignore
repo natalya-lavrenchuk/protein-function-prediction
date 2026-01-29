@@ -13,6 +13,11 @@ models/*
 # Python
 __pycache__/
 *.pyc
+venv/
 .venv/
 .env
 .ipynb_checkpoints/
+
+# System
+.DS_Store
+*.Zone.Identifier
