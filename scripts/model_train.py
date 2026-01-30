@@ -34,23 +34,19 @@ def compute_fmax(y_true, y_prob, thresholds):
 
     for t in thresholds:
         y_pred = (y_prob >= t).astype(int)
-
         tp = np.sum(y_pred * y_true)
         fp = np.sum(y_pred * (1 - y_true))
         fn = np.sum((1 - y_pred) * y_true)
-
         if tp == 0:
             continue
 
         precision = tp / (tp + fp)
         recall = tp / (tp + fn)
         f = 2 * precision * recall / (precision + recall)
-
         if f > best_f:
             best_f, best_t = f, t
 
     return best_f, best_t
-
 
 def main():
     start_time = datetime.now()
@@ -62,11 +58,17 @@ def main():
 
     print("Loading training data...")
 
-    # Read training protein IDs
+    #Read training protein IDs and subsample
     all_ids = read_id_list(cfg["data"]["train_ids"])
-
-    # Use a smaller subset 
-    train_ids = all_ids[:1000]
+    max_n = cfg.get("train", {}).get("max_n", None)
+    if max_n is None:
+        train_ids = all_ids
+    else:
+        rng = np.random.default_rng(cfg.get("train", {}).get("subsample_seed", cfg["run"]["seed"]))
+        max_n = int(max_n)
+        if max_n > len(all_ids):
+            raise ValueError(f"train.max_n={max_n} exceeds available IDs ({len(all_ids)})")
+        train_ids = rng.choice(all_ids, size=max_n, replace=False).tolist()
 
     # Load GO labels and ProtT5 embeddings
     labels = load_train_labels(cfg["data"]["train_labels"])
@@ -74,8 +76,8 @@ def main():
 
     print(f"Embeddings shape: {X.shape}")
 
-    # Use 2-fold CV to reduce runtime
-    cv = KFold(n_splits=2, shuffle=True, random_state=42)
+    cv_folds = int(cfg["run"].get("cv_folds", 10))
+    cv = KFold(n_splits=cv_folds, shuffle=True, random_state=cfg["run"]["seed"])
 
     for aspect in cfg["run"]["aspects"]:
         print(f"\nProcessing Aspect: {aspect}")
@@ -89,20 +91,7 @@ def main():
         Y = build_Y(train_ids, asp_labels, term2idx)
         Y = Y.toarray() if hasattr(Y, "toarray") else Y
 
-        # Remove very rare GO terms to stabilize training
-        min_samples = 10
-        term_freq = np.sum(Y, axis=0)
-        valid = term_freq >= min_samples
-
-        Y = Y[:, valid]
-        go_terms = [t for i, t in enumerate(go_terms) if valid[i]]
-
-        # Limit number of GO terms to keep runtime reasonable
-        max_terms = 200
-        if Y.shape[1] > max_terms:
-            idx = np.argsort(-term_freq[valid])[:max_terms]
-            Y = Y[:, idx]
-            go_terms = [go_terms[i] for i in idx]
+        #I (Christy) removed your pruning limits, I think we should not remove possible labels during training [Remove very rare GO terms to stabilize training + Limit number of GO terms to keep runtime reasonable] but happy to discuss! I think the label space has already been limited by instructor
 
         if Y.shape[1] == 0:
             print("No usable GO terms found, skipping.")
@@ -113,51 +102,43 @@ def main():
         # Save GO term order for later predictions
         joblib.dump(go_terms, f"artifacts/go_terms_{aspect}.pkl")
 
-        # Fast cross-validation using liblinear solver
-        cv_model = OneVsRestClassifier(
-            LogisticRegression(
-                solver="liblinear",
-                max_iter=100,
-                class_weight="balanced"
-            ),
-            n_jobs=1
-        )
+        # Cross-validation
+        solver_cv = cfg.get("model", {}).get("solver_cv", "saga")
+        max_iter_cv = int(cfg.get("model", {}).get("max_iter_cv", 100))
+        cv_model = OneVsRestClassifier(LogisticRegression(
+                solver=solver_cv,
+                max_iter=max_iter_cv,
+                class_weight="balanced",
+                random_state=cfg["run"]["seed"],),n_jobs=-1)
 
         print("Running cross-validation...")
         Y_prob = cross_val_predict(
-            cv_model, X, Y, cv=cv, method="predict_proba", n_jobs=1
-        )
+            cv_model, X, Y, cv=cv, method="predict_proba", n_jobs=1)
 
         # Evaluate model performance using F-max
-        thresholds = np.linspace(0.1, 0.9, 20)
+        thresholds = np.linspace(0.1, 0.9, 10) #Thresholds changes from 20->10 
         fmax, best_t = compute_fmax(Y, Y_prob, thresholds)
-
         print(f"F-max = {fmax:.4f} at threshold ~ {best_t:.2f}")
 
-        np.savez(
-            f"results/metrics_{aspect}.npz",
+        np.savez(f"results/metrics_{aspect}.npz",
             fmax=fmax,
-            threshold=best_t
-        )
+            threshold=best_t)
 
          # Train final model using SAGA solver (as recommended in lectures)
         print("Training final model with SAGA solver...")
-        final_model = OneVsRestClassifier(
-            LogisticRegression(
-                solver="saga",
-                max_iter=300,
-                class_weight="balanced"
-            ),
-            n_jobs=1
-        )
+        solver_final = cfg.get("model", {}).get("solver_final", "saga")
+        max_iter_final = int(cfg.get("model", {}).get("max_iter_final", 300))
+        final_model = OneVsRestClassifier(LogisticRegression(
+                solver=solver_final,
+                max_iter=max_iter_final,
+                class_weight="balanced",
+                random_state=cfg["run"]["seed"]),n_jobs=-1)
 
         final_model.fit(X, Y)
         joblib.dump(final_model, f"models/model_{aspect}.pkl")
 
         print("Model saved successfully.")
-
     print(f"\nDone. Total time: {datetime.now() - start_time}")
-
 
 if __name__ == "__main__":
     main()

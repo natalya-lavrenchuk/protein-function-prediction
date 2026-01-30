@@ -6,9 +6,21 @@ data:
   test_embeddings: "data/raw/biological_data_pfp/test/test_embeddings.h5"
 
 run:
-  seed: 42
+  seed: 42 #For CV split randomness
+  cv_folds: 2 #10 for final report
   aspects: ["molecular_function", "biological_process", "cellular_component"]
+
+train:
+  max_n: 1000 #For all, use "null"
+  subsample_seed: 42 #For subsampling randomness
 
 features:
   embedding_key: null
+
+model:
+  solver_cv: "saga" #Originally "liblinear" but solver inconsistency may cause issues
+  max_iter_cv: 80 #Originally 100
+  solver_final: "saga"
+  max_iter_final: 120 #Originally 300
+
 
