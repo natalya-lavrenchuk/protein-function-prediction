@@ -1,21 +1,30 @@
 Protein Function Prediction Project
 
-Milestone 2: Logistic Regression with SAGA and F-max results
-
 1. Methodology
 
 2. Evaluation & Baseline Comparison
 
-
 Molecular Function (MFO)
- Baseline Naive Fmax=0.4503 | InterPro Fmax=0.6181
+Baseline Naive Fmax=0.4503
+InterPro Fmax=0.6181
+Ensemble model Fmax=0.694
 
 Cellular Component (CCO)
-Baseline Naive Fmax=0.5976 | InterPro Fmax=0.2563
+Baseline Naive Fmax=0.5976
+InterPro Fmax=0.2563
+Ensemble model Fmax=0.711
 
 Biological Process (BPO)
- Baseline Naive Fmax=0.3439 | InterPro Fmax=0.3505
+ Baseline Naive Fmax=0.3439
+ InterPro Fmax=0.3505
+ Ensemble model Fmax=0.454
 
-molecular_function: Fmax=0.694, t_F=0.39, Fmicro=0.694, t_micro=0.39, Smin=4.597, t_S=0.42
-biological_process: Fmax=0.454, t_F=0.35, Fmicro=0.452, t_micro=0.3, Smin=23.55, t_S=0.45
-cellular_component: Fmax=0.711, t_F=0.45, Fmicro=0.709, t_micro=0.38, Smin=6.068, t_S=0.44
+
+
+
+ CHRISTY NOTES for development!!
+ Still have to write all the documentation 
+ Maybe change around with the hyperparemter test set training because its what calculates Fscore and right now im only using 10%
+ PR curves i think can be made with the results/cafa_eval/ files
+ I didnt see Ground truth for test set
+ 
