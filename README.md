@@ -3,13 +3,9 @@ Protein Function Prediction Project
 Milestone 2: Logistic Regression with SAGA and F-max results
 
 1. Methodology
-Algorithm: Multi-label classification using Logistic Regression wrapped in a OneVsRestClassifier strategy.
-Feature Space: Proteins were represented using ProtT5 transformer embeddings (1024-dimensional vectors).
-Computational Optimization: For Cross-Validation - liblinear solver (to rapidly iterate and calculate the Fmax). For the Final Model - SAGA solver (superior handling of large-scale protein data).
-Validation Strategy: 3-fold cross-validation was performed on a representative 1,000-protein subset.
 
 2. Evaluation & Baseline Comparison
-Fmax scores (calculated via cross-validation on a 1,000-protein subset) against the provided Naive and InterPro baselines.
+
 
 Molecular Function (MFO)
  Baseline Naive Fmax=0.4503 | InterPro Fmax=0.6181
@@ -20,8 +16,6 @@ Baseline Naive Fmax=0.5976 | InterPro Fmax=0.2563
 Biological Process (BPO)
  Baseline Naive Fmax=0.3439 | InterPro Fmax=0.3505
 
-Performance Summary: While our current scores are based on only 1% of the training data (1,000 proteins), the strong predictive power is achived. 
-
-molecular_function: Fmax=0.606, 
-biological_process: Fmax=0.373,
-cellular_component: Fmax=0.672, 
+molecular_function: Fmax=0.694, t_F=0.39, Fmicro=0.694, t_micro=0.39, Smin=4.597, t_S=0.42
+biological_process: Fmax=0.454, t_F=0.35, Fmicro=0.452, t_micro=0.3, Smin=23.55, t_S=0.45
+cellular_component: Fmax=0.711, t_F=0.45, Fmicro=0.709, t_micro=0.38, Smin=6.068, t_S=0.44

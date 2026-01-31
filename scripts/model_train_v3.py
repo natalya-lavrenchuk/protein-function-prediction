@@ -11,6 +11,8 @@ import scipy.sparse as sp
 import pandas as pd
 import time
 import warnings
+import json
+import joblib
 
 from datetime import datetime
 from sklearn.feature_extraction.text import HashingVectorizer
@@ -23,14 +25,9 @@ from sklearn.linear_model import SGDClassifier
 from sklearn.model_selection import KFold, cross_val_predict
 from iterstrat.ml_stratifiers import MultilabelStratifiedKFold
 
+LOGGER = logging.getLogger("model_train_v3")
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
 
-LOGGER = logging.getLogger("model_train_v2_ensemble")
-
-
-# -------------------------
-# Logging
-# -------------------------
 def setup_logging(level: str = "INFO", log_file: str | None = None) -> None:
     root = logging.getLogger()
     for h in list(root.handlers):
@@ -60,10 +57,7 @@ def setup_logging(level: str = "INFO", log_file: str | None = None) -> None:
     LOGGER.propagate = True
     LOGGER.info("Logging initialized (level=%s)", level.upper())
 
-
-# -------------------------
-# Paths / IO
-# -------------------------
+#Set up paths
 def validate_paths(cfg: dict) -> None:
     missing = []
 
@@ -90,12 +84,12 @@ def validate_paths(cfg: dict) -> None:
         LOGGER.error(msg)
         raise FileNotFoundError(msg)
 
-
+#Input data
 def read_id_list(path: str) -> list[str]:
     with open(path, "r") as f:
         return [line.strip() for line in f if line.strip()]
 
-
+#Settings for logging
 def log_embedding_stats(X_emb: np.ndarray) -> None:
     arr = np.asarray(X_emb)
     LOGGER.info("Embeddings: shape=%s dtype=%s", arr.shape, arr.dtype)
@@ -112,10 +106,7 @@ def log_embedding_stats(X_emb: np.ndarray) -> None:
         except ValueError:
             LOGGER.warning("Embeddings: could not compute min/max (all-NaN?)")
 
-
-# -------------------------
-# InterPro features
-# -------------------------
+#Load interpro data
 def load_protein2ipr(dat_path: str) -> dict[str, list[str]]:
     p = Path(dat_path)
     if not p.exists():
@@ -148,9 +139,9 @@ def build_ipr_hash_matrix(
     pid2ipr: dict[str, list[str]],
     n_features: int,
 ) -> sp.csr_matrix:
-    docs = [" ".join(pid2ipr.get(pid, [])) for pid in protein_ids]
+    # Dedupe per protein
+    docs = [" ".join(sorted(set(pid2ipr.get(pid, [])))) for pid in protein_ids]
 
-    # Robust tokenization: whitespace split only, no regex token splitting.
     hv = HashingVectorizer(
         n_features=n_features,
         alternate_sign=False,
@@ -178,9 +169,7 @@ def log_ipr_coverage(protein_ids: list[str], pid2ipr: dict[str, list[str]], X_ip
                 float(row_nnz.mean()), int(np.median(row_nnz)), int(row_nnz.max() if row_nnz.size else 0))
 
 
-# -------------------------
-# Labels / metrics
-# -------------------------
+#Filter terms if subset
 def filter_terms_present_in_subset(Y, go_terms: list[str], min_pos: int = 1):
     col_counts = np.asarray(Y.sum(axis=0)).ravel()
     keep = col_counts >= float(min_pos)
@@ -192,7 +181,7 @@ def filter_terms_present_in_subset(Y, go_terms: list[str], min_pos: int = 1):
     go_terms_f = [t for t, k in zip(go_terms, keep) if k]
     return Yf, go_terms_f, keep
 
-
+#Compute Fmax scores
 def compute_fmax(y_true: np.ndarray, y_prob: np.ndarray, thresholds: np.ndarray):
     y_true = (y_true > 0).astype(np.int8)
 
@@ -218,7 +207,7 @@ def compute_fmax(y_true: np.ndarray, y_prob: np.ndarray, thresholds: np.ndarray)
 
     return best_f, best_t
 
-
+#Write cafa files
 def write_cafa_preds(out_file: Path, prot_ids: list[str], go_terms: list[str], probs: np.ndarray,
                      top_k: int = 500, eps: float = 1e-12) -> None:
     out_file.parent.mkdir(parents=True, exist_ok=True)
@@ -251,21 +240,17 @@ def write_cafa_gt(out_file: Path, prot_ids: list[str], asp_labels: dict[str, lis
                 wrote += 1
     return wrote
 
-
-# -------------------------
-# Model helpers
-# -------------------------
 def make_estimator(seed: int) -> OneVsRestClassifier:
     base = SGDClassifier(
         loss="log_loss",
         alpha=1e-5,
         max_iter=50,
+        early_stopping=False,
         tol=1e-3,
         random_state=seed,
         n_jobs=-1,
     )
     return OneVsRestClassifier(base, n_jobs=-1)
-
 
 def tune_alpha_and_threshold(
     Y_true: np.ndarray,
@@ -282,10 +267,7 @@ def tune_alpha_and_threshold(
             best_f, best_a, best_t = float(f), float(a), float(t)
     return best_f, best_a, best_t
 
-
-# -------------------------
-# Main
-# -------------------------
+#Main function 
 def main():
     start_time = datetime.now()
     cfg = yaml.safe_load(open("configs/config.yaml"))
@@ -319,9 +301,12 @@ def main():
         train_ids = rng.choice(all_ids, size=max_n, replace=False).tolist()
     LOGGER.info("Train proteins (after max_n): %d", len(train_ids))
 
-    # Load embeddings (float32 sparse)
+    # Load embeddings
     LOGGER.info("Loading embeddings...")
-    X_emb_dense = load_embeddings_h5(cfg["data"]["train_embeddings"], train_ids, key=cfg.get("features", {}).get("embedding_key", None))
+    X_emb_dense = load_embeddings_h5(
+    cfg["data"]["train_embeddings"],
+    train_ids)
+
     log_embedding_stats(X_emb_dense)
     X_emb = sp.csr_matrix(np.asarray(X_emb_dense, dtype=np.float32))
     LOGGER.info("X_emb: shape=%s nnz=%d", X_emb.shape, X_emb.nnz)
@@ -340,7 +325,11 @@ def main():
     aspects = cfg["run"]["aspects"]
     LOGGER.info("Aspects: %s", aspects)
 
-    # Training params
+    models_dir = Path("models")
+    artifacts_dir = Path("artifacts")
+    metrics_dir = Path("metrics")
+
+    # Training parameters
     min_pos = int(cfg.get("train", {}).get("min_pos_in_subset", 1))
     cv_folds = int(cfg["run"].get("cv_folds", 3))
     seed = int(cfg["run"]["seed"])
@@ -350,7 +339,7 @@ def main():
     alphas = np.linspace(0.0, 1.0, 11)  # 0.0,0.1,...,1.0
 
     for aspect in aspects:
-        LOGGER.info("=== Aspect: %s ===", aspect)
+        LOGGER.info("Aspect: %s ", aspect)
         asp_labels = labels[aspect]
 
         # Build Y on subset
@@ -365,7 +354,7 @@ def main():
         Y_train = Yf.toarray() if sp.issparse(Yf) else np.asarray(Yf)
         LOGGER.info("Classes kept (pos>=%d): %d / %d", min_pos, Y_train.shape[1], len(go_terms))
 
-        # IMPORTANT: train/eval only on proteins with >=1 label in this aspect
+        # Train only on proteins with >=1 label in this aspect
         has_label = (Y_train.sum(axis=1) > 0)
         n_lab = int(has_label.sum())
         LOGGER.info("Proteins with >=1 label in %s: %d / %d", aspect, n_lab, Y_train.shape[0])
@@ -376,9 +365,6 @@ def main():
         X_emb_a = X_emb[has_label]
         X_ipr_a = X_ipr[has_label]
         Y_a = Y_train[has_label]
-
-        # Also apply the same term filter to ensure both models predict same columns
-        # (already done via Yf/keep above)
 
         est = make_estimator(seed)
 
@@ -434,8 +420,66 @@ def main():
         except Exception:
             LOGGER.warning("[CAFA inputs] could not read preds head")
 
-    LOGGER.info("Elapsed time: %s", datetime.now() - start_time)
+        LOGGER.info("Fitting FINAL per-aspect models on all labeled proteins...")
 
+        est_emb_final = make_estimator(seed)
+        est_ipr_final = make_estimator(seed)
+
+        t0 = time.time()
+        est_emb_final.fit(X_emb_a, Y_a)
+        LOGGER.info("Final embeddings model fit in %.2f s", time.time() - t0)
+
+        t0 = time.time()
+        est_ipr_final.fit(X_ipr_a, Y_a)
+        LOGGER.info("Final interpro model fit in %.2f s", time.time() - t0)
+
+        # Save GO term list (order matches model outputs)
+        go_terms_path = artifacts_dir/ f"go_terms_{aspect}.pkl"
+        joblib.dump(go_terms_f, go_terms_path)
+        LOGGER.info("Saved GO term list: %s", go_terms_path)
+
+        # Save ensemble bundle (both models + alpha/threshold + metadata)
+        model_path = models_dir / f"model_{aspect}.pkl"
+        bundle = {
+                "aspect": aspect,
+                "model_emb": est_emb_final,
+                "model_ipr": est_ipr_final,
+                "alpha": float(a_best),
+                "threshold": float(t_best),
+                "go_terms": go_terms_f,
+                "metadata": {
+                    "ipr_hash_dim": int(n_hash),
+                    "ipr_doc_convention": "docs = ' '.join(sorted(set(pid2ipr[pid]))) ; tokenizer=str.split ; lowercase=False ; alternate_sign=False",
+                    "min_pos_in_subset": int(min_pos),
+                    "cv_folds": int(cv_folds),
+                    "seed": int(seed),
+                },
+            }
+        joblib.dump(bundle, model_path)
+        LOGGER.info("Saved model bundle: %s", model_path)
+
+        # Save metrics
+        metrics_path = metrics_dir / f"metrics_{aspect}.json"
+        metrics = {
+                "aspect": aspect,
+                "n_train_ids_total": int(len(train_ids)),
+                "n_subset_rows": int(Y_train.shape[0]),
+                "n_labeled_rows": int(n_lab),
+                "n_terms_initial": int(len(go_terms)),
+                "n_terms_kept": int(len(go_terms_f)),
+                "fmax_emb": float(f_emb),
+                "t_emb": float(t_emb),
+                "fmax_ipr": float(f_ipr),
+                "t_ipr": float(t_ipr),
+                "fmax_ens": float(f_best),
+                "alpha_best": float(a_best),
+                "t_best": float(t_best),
+            }
+        with metrics_path.open("w", encoding="utf-8") as f:
+                json.dump(metrics, f, indent=2)
+        LOGGER.info("Saved metrics: %s", metrics_path)
+    
+    LOGGER.info("Elapsed time: %s", datetime.now() - start_time)
 
 if __name__ == "__main__":
     main()

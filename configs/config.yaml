@@ -1,28 +1,25 @@
 data:
   train_ids: "data/raw/biological_data_pfp/train/train_ids.txt"
-  test_ids: "data/raw/biological_data_pfp/test/test_ids.txt"
   train_labels: "data/raw/biological_data_pfp/train/train_set.tsv"
   train_embeddings: "data/raw/biological_data_pfp/train/train_embeddings.h5"
+  train_ipr: "data/raw/biological_data_pfp/train/train_protein2ipr.dat"
+  test_ids: "data/raw/biological_data_pfp/test/test_ids.txt"
   test_embeddings: "data/raw/biological_data_pfp/test/test_embeddings.h5"
-  train_ipr: "data/raw/biological_data_pfp/train/train_protein2ipr.dat" #Optional
+  test_ipr: "data/raw/biological_data_pfp/test/test_protein2ipr.dat"
 
 run:
   seed: 42 #For CV split randomness
-  cv_folds: 5 #10 for final report
+  cv_folds: 10 #CV folds for hyperparameter tuning and accuracy estimations
   aspects: ["molecular_function", "biological_process", "cellular_component"] #["molecular_function", "biological_process", "cellular_component"]
 
 train:
-  max_n: 5000 #For all, use "null"
+  max_n_hyperparameters: 10000 #For hyperparameter tuning, just use 10% of the dataset
+  max_n_final: null
   subsample_seed: 42 #For subsampling randomness
-  min_pos_in_subset: 3 #Minimum positive samples per GO term in training subset
+  min_pos_in_subset: 5 #Minimum positive samples per GO term in training subset
 
 features:
   embedding_key: null
 
-model:
-  solver_cv: "saga" #Originally "liblinear" but solver inconsistency may cause issues
-  max_iter_cv: 80 #Originally 100
-  solver_final: "saga"
-  max_iter_final: 120 #Originally 300
 
 
