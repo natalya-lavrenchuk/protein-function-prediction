@@ -7,3 +7,4 @@ pyyaml
 tqdm
 joblib
 matplotlib
+iterative-stratification

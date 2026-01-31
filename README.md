@@ -12,12 +12,16 @@ Validation Strategy: 3-fold cross-validation was performed on a representative 1
 Fmax scores (calculated via cross-validation on a 1,000-protein subset) against the provided Naive and InterPro baselines.
 
 Molecular Function (MFO)
-Our SAGA Model: Fmax=0.3283 | Baseline Naive Fmax=0.4503 | InterPro Fmax=0.6181
+ Baseline Naive Fmax=0.4503 | InterPro Fmax=0.6181
 
 Cellular Component (CCO)
-Our SAGA Model: Fmax=0.4619 | Baseline Naive Fmax=0.5976 | InterPro Fmax=0.2563
+Baseline Naive Fmax=0.5976 | InterPro Fmax=0.2563
 
 Biological Process (BPO)
-Our SAGA Model: Fmax=0.2768 | Baseline Naive Fmax=0.3439 | InterPro Fmax=0.3505
+ Baseline Naive Fmax=0.3439 | InterPro Fmax=0.3505
 
 Performance Summary: While our current scores are based on only 1% of the training data (1,000 proteins), the strong predictive power is achived. 
+
+molecular_function: Fmax=0.606, 
+biological_process: Fmax=0.373,
+cellular_component: Fmax=0.672, 

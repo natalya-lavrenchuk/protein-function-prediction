@@ -176,7 +176,7 @@ def main():
             fmax=fmax,
             threshold=best_t)
 
-        # NEW: Write CAFA-eval inputs
+        #Write CAFA-eval inputs
         aspect_dir = cafa_root / aspect
         pred_dir = aspect_dir / "preds"
         gt_file = aspect_dir / "gt.tsv"

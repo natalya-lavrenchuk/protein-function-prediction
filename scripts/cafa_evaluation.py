@@ -1,74 +1,53 @@
-import sys
-from pathlib import Path
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT))
-
 import argparse
-import pandas as pd
-from cafaeval.evaluation import cafa_eval, write_results
-
-
-def extract_fmax(out_dir: Path) -> float:
-    """
-    Robust extraction of Fmax from cafaeval outputs.
-    Looks for evaluation_best_f.tsv (common) or best-* files.
-    """
-    best_path = out_dir / "evaluation_best_f.tsv"
-    if not best_path.exists():
-        candidates = list(out_dir.glob("evaluation_best*.tsv"))
-        if not candidates:
-            raise FileNotFoundError(f"No cafaeval best-results file found in {out_dir}")
-        best_path = candidates[0]
-
-    df = pd.read_csv(best_path, sep="\t")
-    for col in ["fmax", "Fmax", "f_max", "F_max"]:
-        if col in df.columns:
-            return float(df[col].iloc[0])
-
-    # fallback: pick the first column that looks like f
-    for col in df.columns:
-        if "f" in col.lower():
-            try:
-                return float(df[col].iloc[0])
-            except Exception:
-                pass
-
-    raise ValueError(f"Could not find an Fmax column in {best_path}. Columns: {list(df.columns)}")
+import subprocess
+from pathlib import Path
+import sys
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Run CAFA evaluator on predictions.")
+    ap = argparse.ArgumentParser()
     ap.add_argument("--obo", required=True, help="Path to go-basic.obo")
-    ap.add_argument("--pred_dir", required=True, help="Directory containing prediction .tsv files")
-    ap.add_argument("--gt", required=True, help="Ground truth .tsv file (CAFA format: PID GO)")
-    ap.add_argument("--out_dir", required=True, help="Output directory for cafaeval results")
-    ap.add_argument("--th_step", type=float, default=None, help="Optional threshold step (e.g., 0.02)")
-
+    ap.add_argument("--pred_dir", required=True, help="Directory containing CAFA preds files")
+    ap.add_argument("--gt", required=True, help="Ground truth tsv (protein_id GO:xxxxxxx)")
+    ap.add_argument("--out_dir", required=True, help="Output directory for evaluator results")
+    ap.add_argument("--use_module", action="store_true",
+                    help="If set, run evaluator as: python -m cafaeval ... instead of cafaeval ...")
     args = ap.parse_args()
 
+    obo = Path(args.obo)
+    pred_dir = Path(args.pred_dir)
+    gt = Path(args.gt)
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Run evaluator
-    if args.th_step is None:
-        res = cafa_eval(args.obo, args.pred_dir, args.gt)
+    if not obo.exists():
+        raise FileNotFoundError(obo)
+    if not pred_dir.exists():
+        raise FileNotFoundError(pred_dir)
+    if not gt.exists():
+        raise FileNotFoundError(gt)
+
+    # ---- Adjust this command if your course uses a different evaluator entrypoint ----
+    if args.use_module:
+        cmd = [sys.executable, "-m", "cafaeval",
+               "--obo", str(obo),
+               "--pred_dir", str(pred_dir),
+               "--gt", str(gt),
+               "--out_dir", str(out_dir)]
     else:
-        res = cafa_eval(args.obo, args.pred_dir, args.gt, th_step=args.th_step)
+        cmd = ["cafaeval",
+               "--obo", str(obo),
+               "--pred_dir", str(pred_dir),
+               "--gt", str(gt),
+               "--out_dir", str(out_dir)]
 
-    # If overlap is 0, cafaeval returns empty/None structures
-    if res is None or len(res) < 2 or res[0] is None:
-        raise RuntimeError(
-            "cafaeval produced no evaluation (likely empty predictions or zero overlap with ground truth)."
-        )
+    print("Running:", " ".join(cmd))
+    res = subprocess.run(cmd, capture_output=True, text=True)
 
-    df, dfs_best = res[0], res[1]
-    # Some cafaeval versions also return extra elements; write_results accepts (df, dfs_best,...)
-    write_results(df, dfs_best, out_dir=str(out_dir))
-
-    fmax = extract_fmax(out_dir)
-    print(f"Fmax: {fmax:.4f}")
-    print(f"Results written to: {out_dir}")
+    print(res.stdout)
+    if res.returncode != 0:
+        print(res.stderr, file=sys.stderr)
+        raise SystemExit(res.returncode)
 
 
 if __name__ == "__main__":
