@@ -1,9 +1,6 @@
 from pathlib import Path
 import yaml
 
-# --------------------------------------------------
-# Paths
-# --------------------------------------------------
 REPO_ROOT = Path(r"C:\work\protein-function-prediction")
 
 CONFIG_PATH = REPO_ROOT / "configs/config.yaml"
@@ -12,9 +9,6 @@ TRAIN_IDS_TXT = REPO_ROOT / "data/raw/biological_data_pfp/train/train_ids.txt"
 OUT_DIR = REPO_ROOT / "data/processed"
 
 
-# --------------------------------------------------
-# Helpers
-# --------------------------------------------------
 def load_config(path: Path):
     with open(path, "r") as f:
         return yaml.safe_load(f)
@@ -51,10 +45,6 @@ def make_ground_truth(train_set_tsv: Path, out_tsv: Path, protein_ids, aspect):
 
     print(f"[OK] {aspect}: wrote {wrote} lines → {out_tsv}")
 
-
-# --------------------------------------------------
-# Main
-# --------------------------------------------------
 def main():
     cfg = load_config(CONFIG_PATH)
 

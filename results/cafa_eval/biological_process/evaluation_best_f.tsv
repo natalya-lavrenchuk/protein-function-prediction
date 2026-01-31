@@ -1,2 +1,2 @@
 filename	ns	tau	n	tp	fp	fn	pr	rc	cov	mi	ru	f	s	pr_micro	rc_micro	f_micro	cov_max
-pred.tsv	biological_process	0.370	1327.000	10.358	21.397	21.576	0.363	0.384	0.997	21.397	21.576	0.373	30.386	0.326	0.324	0.325	1.000
+pred.tsv	biological_process	0.400	3349.000	10.971	17.629	20.689	0.429	0.413	0.997	17.629	20.689	0.421	27.181	0.384	0.347	0.364	1.000
