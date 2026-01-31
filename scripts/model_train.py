@@ -24,7 +24,6 @@ from src.data.build_matrices import build_label_space, build_Y
 # Ignore convergence warnings to keep output clean
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
 
-
 def compute_fmax(y_true, y_prob, thresholds):
     """
     Compute F-max by trying different probability thresholds
@@ -47,6 +46,45 @@ def compute_fmax(y_true, y_prob, thresholds):
             best_f, best_t = f, t
 
     return best_f, best_t
+
+def write_cafa_preds(out_file: Path, prot_ids, go_terms, probs, top_k=500, eps=1e-9):
+    """
+    Write CAFA predictions:
+      PID GO:xxxxxxx score
+    Use top_k per protein to keep file size manageable.
+    """
+    out_file.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(out_file, "w") as f:
+        for i, pid in enumerate(prot_ids):
+            row = probs[i]
+            idx = np.argsort(row)[::-1][:top_k]
+            for j in idx:
+                s = float(row[j])
+                if s <= eps:
+                    continue
+                f.write(f"{pid} {go_terms[j]} {s:.6g}\n")
+
+
+def write_cafa_gt(out_file: Path, prot_ids, asp_labels):
+    """
+    Write CAFA ground truth:
+      PID GO:xxxxxxx
+    Only for prot_ids.
+    """
+    out_file.parent.mkdir(parents=True, exist_ok=True)
+    wrote = 0
+
+    with open(out_file, "w") as f:
+        for pid in prot_ids:
+            terms = asp_labels.get(pid, None)
+            if not terms:
+                continue
+            for go in terms:
+                f.write(f"{pid} {go}\n")
+                wrote += 1
+
+    return wrote
 
 def main():
     start_time = datetime.now()
@@ -79,6 +117,10 @@ def main():
     cv_folds = int(cfg["run"].get("cv_folds", 10))
     cv = KFold(n_splits=cv_folds, shuffle=True, random_state=cfg["run"]["seed"])
 
+    # Where we write CAFA-compatible inputs for external evaluation
+    cafa_root = Path("results") / "cafa_inputs"
+    cafa_root.mkdir(parents=True, exist_ok=True)
+
     for aspect in cfg["run"]["aspects"]:
         print(f"\nProcessing Aspect: {aspect}")
 
@@ -91,7 +133,17 @@ def main():
         Y = build_Y(train_ids, asp_labels, term2idx)
         Y = Y.toarray() if hasattr(Y, "toarray") else Y
 
-        #I (Christy) removed your pruning limits, I think we should not remove possible labels during training [Remove very rare GO terms to stabilize training + Limit number of GO terms to keep runtime reasonable] but happy to discuss! I think the label space has already been limited by instructor
+        # Enfore minimum term counts even for subsampled data
+        counts = Y.sum(axis=0)
+        min_counts = {
+            "molecular_function": 50,
+            "biological_process": 250,
+            "cellular_component": 50,
+        }
+
+        keep = counts >= min_counts[aspect]
+        Y = Y[:, keep]
+        go_terms = [go_terms[i] for i in np.where(keep)[0]]
 
         if Y.shape[1] == 0:
             print("No usable GO terms found, skipping.")
@@ -116,7 +168,7 @@ def main():
             cv_model, X, Y, cv=cv, method="predict_proba", n_jobs=1)
 
         # Evaluate model performance using F-max
-        thresholds = np.linspace(0.1, 0.9, 10) #Thresholds changes from 20->10 
+        thresholds = np.linspace(0.1, 0.9, 20) 
         fmax, best_t = compute_fmax(Y, Y_prob, thresholds)
         print(f"F-max = {fmax:.4f} at threshold ~ {best_t:.2f}")
 
@@ -124,7 +176,27 @@ def main():
             fmax=fmax,
             threshold=best_t)
 
-         # Train final model using SAGA solver (as recommended in lectures)
+        # NEW: Write CAFA-eval inputs
+        aspect_dir = cafa_root / aspect
+        pred_dir = aspect_dir / "preds"
+        gt_file = aspect_dir / "gt.tsv"
+        pred_file = pred_dir / "pred.tsv"
+
+        pred_dir.mkdir(parents=True, exist_ok=True)
+        for old in pred_dir.glob("*"):
+            old.unlink()
+
+        if max_n is None and aspect == "biological_process":
+            print("[WARN] train.max_n is None; cafaeval for BP may run out of memory. "
+                  "Consider setting train.max_n (e.g., 1000).")
+
+        write_cafa_preds(pred_file, train_ids, go_terms, Y_prob, top_k=500)
+        gt_lines = write_cafa_gt(gt_file, train_ids, asp_labels)
+
+        print(f"[CAFA inputs] preds_dir: {pred_dir}")
+        print(f"[CAFA inputs] gt_file:  {gt_file} ({gt_lines} lines)")
+        
+        # Train final model using SAGA solver (as recommended in lectures)
         print("Training final model with SAGA solver...")
         solver_final = cfg.get("model", {}).get("solver_final", "saga")
         max_iter_final = int(cfg.get("model", {}).get("max_iter_final", 300))

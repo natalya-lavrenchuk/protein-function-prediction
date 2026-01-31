@@ -8,7 +8,7 @@ data:
 run:
   seed: 42 #For CV split randomness
   cv_folds: 2 #10 for final report
-  aspects: ["molecular_function", "biological_process", "cellular_component"]
+  aspects: ["molecular_function", "biological_process", "cellular_component"] #["molecular_function", "biological_process", "cellular_component"]
 
 train:
   max_n: 1000 #For all, use "null"
