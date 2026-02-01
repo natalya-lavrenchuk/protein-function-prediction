@@ -1,2 +1,0 @@
-filename	ns	tau	n	tp	fp	fn	pr	rc	cov	mi	ru	f	s	pr_micro	rc_micro	f_micro	cov_max
-pred.tsv	molecular_function	0.390	4473.000	5.855	2.672	3.790	0.736	0.656	0.999	2.672	3.790	0.694	4.637	0.687	0.607	0.644	1.000

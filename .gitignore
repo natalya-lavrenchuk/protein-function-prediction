@@ -23,3 +23,19 @@ results/
 models/
 *.pkl
 .DS_Store
+
+# --- Generated / large artifacts ---
+models/
+artifacts/
+outputs/
+results/
+metrics/
+figures/
+
+# OS junk
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.venv/

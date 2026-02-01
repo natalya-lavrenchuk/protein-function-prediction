@@ -1,2 +1,0 @@
-filename	ns	tau	n	tp	fp	fn	pr	rc	cov	mi	ru	f	s	pr_micro	rc_micro	f_micro	cov_max
-pred.tsv	cellular_component	0.440	6800.000	7.860	2.936	5.310	0.752	0.674	1.000	2.936	5.310	0.711	6.068	0.728	0.597	0.656	1.000
