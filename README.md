@@ -84,7 +84,7 @@ Minimum positives per GO term
 
 Random seed and CV folds
 
-🧠 Model Overview
+Model Overview
 Features
 
 Embeddings: Precomputed protein embeddings (.h5)
@@ -110,7 +110,7 @@ P_final = λ · P_embeddings + (1 − λ) · P_interpro (+ BLAST if enabled)
 
 λ is selected via validation to maximize Fmax.
 
-🚀 Running the Pipeline
+Running the Pipeline
 Option 1 (Recommended): Run everything via the master notebook
 
 Open:
@@ -235,4 +235,5 @@ Natalya Lavrenchuk (ID 2141882)
 Christina Caporale (ID 2141881)
 Iuliia Osipova (ID 2148937)
 Master’s Students — Data Science and Computational Chemistry
+
 Protein Function Prediction Project
