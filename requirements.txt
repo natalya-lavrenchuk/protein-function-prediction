@@ -8,3 +8,4 @@ tqdm
 joblib
 matplotlib
 iterative-stratification
+cafaeval

@@ -13,11 +13,13 @@ models/*
 # Python
 __pycache__/
 *.pyc
-venv/
 .venv/
 .env
 .ipynb_checkpoints/
 
-# System
+artifacts/
+metrics/
+results/
+models/
+*.pkl
 .DS_Store
-*.Zone.Identifier
