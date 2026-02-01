@@ -1,0 +1,16 @@
+{
+  "aspect": "cellular_component",
+  "n_train_ids_hp": 10000,
+  "n_labeled_hp": 6800,
+  "n_train_ids_final": 123969,
+  "n_labeled_final": 84638,
+  "n_terms_initial": 678,
+  "n_terms_kept": 612,
+  "fmax_emb_hp": 0.5907267026629762,
+  "t_emb_hp": 0.32,
+  "fmax_ipr_hp": 0.5274872900939762,
+  "t_ipr_hp": 0.35000000000000003,
+  "fmax_ens_hp": 0.5992912210892812,
+  "alpha_best": 0.7000000000000001,
+  "t_best": 0.36000000000000004
+}

@@ -1,0 +1,13 @@
+{
+  "aspect": "molecular_function",
+  "n_test": 1000,
+  "n_terms": 737,
+  "model_path": "models/model_molecular_function.pkl",
+  "alpha": 0.6000000000000001,
+  "threshold": 0.34,
+  "ipr_hash_dim": 262144,
+  "test_ids_path": "data/raw/biological_data_pfp/test/test_ids.txt",
+  "test_embeddings_path": "data/raw/biological_data_pfp/test/test_embeddings.h5",
+  "test_ipr_path": "data/raw/biological_data_pfp/test/test_protein2ipr.dat",
+  "output_pred_file": "results/test_inference_outputs/molecular_function/preds/pred_test.tsv"
+}
