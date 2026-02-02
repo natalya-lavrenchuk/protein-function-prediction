@@ -55,8 +55,6 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Note: BLAST evaluation requires BLAST results to already be generated and placed in data/splits/. BLAST is not run automatically inside this repo.
-
 ## Configuration
 
 All file paths and hyperparameters are defined in:
@@ -86,7 +84,10 @@ The pipeline can be reconfigured **without modifying code**.
 - Separate model per GO aspect
 - Probabilistic outputs
 
-**Note:** BLAST was treated as a post-training component: it was evaluated exclusively on a held-out validation set to select ensemble weights, and then integrated with the trained embedding+InterPro model only at test time.
+**Note on BLAST usage:**  
+BLAST was treated as a post-training component. It was evaluated only on a held-out validation set to select optimal ensemble weights, which were then fixed and applied at test time alongside the trained embedding + InterPro model.
+
+BLAST is **not executed automatically within this repository** due to storage and runtime constraints. Users who wish to run BLAST-based evaluation or testing must generate BLAST results externally and place them in `data/splits/` before running the relevant scripts.
 
 ### Ensemble
 
@@ -205,4 +206,5 @@ Christina Caporale (ID 2141881)
 Iuliia Osipova (ID 2148937)
 Master’s Students — Data Science and Computational Chemistry
 University of Padova
+
 
