@@ -1,239 +1,208 @@
-Protein Function Prediction (GO Term Assignment)
+# Protein Function Prediction (GO Term Assignment)
 
-This repository implements a multi-label protein function prediction pipeline for Gene Ontology (GO) terms, using a combination of:
+This repository contains a protein function prediction pipeline for assigning
+**Gene Ontology (GO) terms** to proteins.  
+The project combines multiple sources of biological information and evaluates
+performance using **CAFA-style metrics**.
 
-Protein sequence embeddings
+The final system uses an **ensemble model** based on:
+- protein sequence embeddings
+- InterPro (IPR) domain annotations
+- BLAST-based annotation transfer
 
-InterPro (IPR) domain features
+## Project Structure
 
-Optional BLAST-based annotation transfer
-
-Linear classifiers with ensemble blending
-
-CAFA-style evaluation (Fmax, PR curves)
-
-The project supports training, validation, testing, evaluation, and submission generation, with all steps orchestrated through a master notebook.
-
-Project Structure
+```text
 protein-func-pred/
-│
-├── artifacts/              # Saved GO term lists per aspect
+├── artifacts/                  # Saved GO term lists per aspect
 ├── configs/
-│   └── config.yaml         # Central configuration file
-│
+│   └── config.yaml             # Central configuration file
 ├── data/
-│   ├── raw/                # Original provided datasets
-│   └── splits/             # Train/val splits, BLAST results
-│
-├── figures/                # Generated plots for the report
-├── metrics/                # JSON metrics (Fmax, thresholds, etc.)
-│
-├── models/                 # Trained models (one per GO aspect)
-│   ├── model_biological_process.pkl
-│   ├── model_cellular_component.pkl
-│   └── model_molecular_function.pkl
-│
+│   ├── raw/                    # Original provided datasets
+│   └── splits/                 # Train/val splits, BLAST results
+├── figures/                    # Generated plots for the report
+├── metrics/                    # JSON metrics (Fmax, thresholds, etc.)
+├── models/                     # Trained models (one per GO aspect)
 ├── outputs/
-│   ├── preds_raw/          # Raw prediction matrices
-│   ├── submission/         # Earlier submissions
-│   ├── submission_v4/      # Final embedding + IPR ensemble
-│   └── submission_v4_blast # Final ensemble + BLAST
-│
-├── results/                # CAFA-style intermediate outputs
-│
+│   ├── preds_raw/              # Raw prediction matrices
+│   ├── submission_v4/          # Final embedding + IPR ensemble
+│   └── submission_v4_blast/    # Final ensemble + BLAST
+├── results/                    # CAFA-style intermediate outputs
 ├── scripts/
-│   ├── model_train_v4.py           # Final training pipeline
-│   ├── predict_test_v4.py          # Test-set prediction
-│   ├── eval_model_plus_blast_val.py# Validation with BLAST
-│   ├── eval_blast_transfer.py      # BLAST-only baseline
-│   ├── plots.py                    # Plot utilities
-│   ├── master_file.ipynb           # Main execution notebook
-│   └── (older versions kept for reference)
-│
+│   ├── model_train_v4.py       # Final training pipeline
+│   ├── predict_test_v4.py      # Test-set prediction
+│   ├── eval_model_plus_blast_val.py  # Validation with BLAST
+│   ├── eval_blast_transfer.py  # BLAST-only baseline
+│   ├── plots.py                # Plot utilities
+│   └── master_file.ipynb       # Main execution notebook
 ├── requirements.txt
 ├── README.md
-└── report/                  # Final report and figures
+└── report/                     # Final report and figures
+```
 
-Environment Setup
-1. Create and activate a virtual environment
+---
+
+## Environment Setup
+
+1. Create and activate a virtual environment:
+```text
 python -m venv .venv
 source .venv/bin/activate
+```
 
 2. Install dependencies
+```text
 pip install -r requirements.txt
-
+```
 
 Note: BLAST evaluation requires BLAST results to already be generated and placed in data/splits/. BLAST is not run automatically inside this repo.
 
-Configuration
+## Configuration
 
-All paths and hyperparameters are defined in:
-
+All file paths and hyperparameters are defined in:
+```text
 configs/config.yaml
+```
 
+This includes:
+- data paths (train/test/BLAST)
+- random seed
+- cross-validation folds
+- GO aspects
+- subsampling size
+- minimum number of positives per GO term
 
-Key options include:
+The pipeline can be reconfigured **without modifying code**.
 
-Training/test file paths
+---
+## Model Overview
+### Features
+1. Embeddings: Precomputed protein embeddings (.h5)
+2. InterPro: Hashed domain features using HashingVectorizer
+3. BLAST: Annotation transfer baseline
 
-GO aspects (molecular_function, biological_process, cellular_component)
+### Models
+- One-vs-Rest SGDClassifier (logistic loss)
+- Separate model per GO aspect
+- Probabilistic outputs
 
-Subsampling for hyperparameter tuning
+**Note:** BLAST was treated as a post-training component: it was evaluated exclusively on a held-out validation set to select ensemble weights, and then integrated with the trained embedding+InterPro model only at test time.
 
-Minimum positives per GO term
-
-Random seed and CV folds
-
-Model Overview
-Features
-
-Embeddings: Precomputed protein embeddings (.h5)
-
-InterPro: Hashed domain features using HashingVectorizer
-
-BLAST (optional): Annotation transfer baseline
-
-Models
-
-One-vs-Rest SGDClassifier (logistic loss)
-
-Separate model per GO aspect
-
-Probabilistic outputs
-
-Ensemble
+### Ensemble
 
 Final prediction scores are computed as:
-
+```text
 P_final = λ · P_embeddings + (1 − λ) · P_interpro (+ BLAST if enabled)
-
-
 λ is selected via validation to maximize Fmax.
+```
 
-Running the Pipeline
-Option 1 (Recommended): Run everything via the master notebook
+## Running the Pipeline
 
-Open:
-
+To train the models, validate, and test most probabilistic GO terms, run the master file:
+```text
 scripts/master_file.ipynb
-
-
+```
 This notebook runs, in order:
+1. Training (model_train_v4.py) on embeddings and InterPro
+2. Validation & threshold selection
+3. BLAST validation (optional)
+4. Figure generation (PR curves, F1 vs threshold)
+5. Test-set prediction
+6. Submission file creation
 
-Training (model_train_v4.py)
-
-Validation & threshold selection
-
-BLAST validation (optional)
-
-Figure generation (PR curves, F1 vs threshold)
-
-Test-set prediction
-
-Submission file creation
-
-Option 2: Run scripts manually
-Train the model
-python scripts/model_train_v4.py
+**Note:** Full training on the complete dataset can take approximately **1–2 hours**
+depending on hardware. Hyperparameter tuning is performed on a subsampled training
+set to reduce runtime.
 
 
-Outputs:
+## Outputs:
 
-Models → models/
+### Model Training and Validation
+Models
+```text
+models/
+└── model_biological_process.pkl
+└── model_cellular_component.pkl
+└── model_molecular_function.pkl
+```
 
-Metrics → metrics/
+Metrics
+```text
+metrics/
+└── metrics_biological_process.json
+└── metrics_blast_val.json
+└── metrics_cellular_components.json
+└── metrics_model_plus_blast_val.json
+└── metrics_molecular_funtion.json
+```
 
-Artifacts → artifacts/
-
-Evaluate BLAST transfer (optional)
+Evaluate BLAST transfer:
+```text
 python scripts/eval_blast_transfer.py
+```
 
 Validate model + BLAST ensemble
+```text
 python scripts/eval_model_plus_blast_val.py
+```
 
-Predict on the test set
+### Predict on Test Set
+```text
 python scripts/predict_test_v4.py
-
-
-Outputs:
 
 outputs/submission_v4/
 └── submission_final.tsv
+```
 
-Evaluation Metrics
+## Evaluation Metrics
+- The project uses CAFA-style evaluation, including:
+- Fmax (maximum micro-averaged F1 across thresholds)
+- Precision–Recall curves (micro-weighted)
+- F1 vs threshold plots
+- GO term prediction counts per protein
 
-The project uses CAFA-style evaluation, including:
+Metrics are saved as JSON files in: metrics/
+Figures are saved to: figures/
 
-Fmax (maximum micro-averaged F1 across thresholds)
-
-Precision–Recall curves (micro-weighted)
-
-F1 vs threshold plots
-
-GO term prediction counts per protein
-
-Metrics are saved as JSON files in:
-
-metrics/
-
-
-Figures are saved to:
-
-figures/
-
-Figures Generated
-
+## Figures Generated
 Key plots used in the report:
+- F1 vs threshold (per GO aspect)
+- Precision–Recall curves (micro-weighted)
+- Model comparison (embeddings vs IPR vs ensemble)
+- GO term filtering statistics
 
-F1 vs threshold (per GO aspect)
-
-Precision–Recall curves (micro-weighted)
-
-Model comparison (embeddings vs IPR vs ensemble)
-
-GO term filtering statistics
-
-Distribution of predicted GO terms per protein
-
-BLAST Integration (Optional)
-
+BLAST Integration
 BLAST is treated as an annotation transfer baseline and can be:
+- Evaluated alone
+- Blended with the embedding + IPR ensemble
+- BLAST results must be provided as TSV files with:
 
-Evaluated alone
-
-Blended with the embedding + IPR ensemble
-
-BLAST results must be provided as TSV files with:
-
+```text
 query   target   bits   evalue   score
-
-
+```
 BLAST is not required to run the core pipeline.
 
-Final Output
+## Final Output
 
 The final submission file follows the CAFA format:
-
+```text
 ProteinID   GO:XXXXXXX   score
-
-
+```
 Located at:
-
+```text
 outputs/submission_v4/submission_final.tsv
+```
 
-Notes for Reviewers
+## Notes for Reviewers
+- The full training set is large; hyperparameter tuning is performed on a subsample for efficiency.
+- Thresholds are selected based on validation Fmax, not arbitrarily.
+- Older scripts are retained for transparency and comparison.
 
-The full training set is large; hyperparameter tuning is performed on a subsample for efficiency.
-
-Thresholds are selected based on validation Fmax, not arbitrarily.
-
-Older scripts are retained for transparency and comparison.
-
-Authors
+## Authors
 
 Natalya Lavrenchuk (ID 2141882)
 Christina Caporale (ID 2141881)
 Iuliia Osipova (ID 2148937)
 Master’s Students — Data Science and Computational Chemistry
+University of Padova
 
-Protein Function Prediction Project
