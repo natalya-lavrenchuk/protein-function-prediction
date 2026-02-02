@@ -91,10 +91,14 @@ BLAST is **not executed automatically within this repository** due to storage an
 
 ### Ensemble
 
-Final prediction scores are computed as:
+Training and final prediction scores are computed as:
 ```text
-P_final = λ · P_embeddings + (1 − λ) · P_interpro (+ BLAST if enabled)
-λ is selected via validation to maximize Fmax.
+P_train = α · P_emb + (1-α)·P_ipr,
+P_final = λ · P_train + (1 − λ) · P_blast
+
+where,
+α is the training ensemble weight between embeddings and InterPro domains
+λ is determined in validation to maximize Fmax while incorporating BLAST
 ```
 
 ## Running the Pipeline
@@ -206,5 +210,6 @@ Christina Caporale (ID 2141881)
 Iuliia Osipova (ID 2148937)
 Master’s Students — Data Science and Computational Chemistry
 University of Padova
+
 
 
